@@ -7,29 +7,23 @@ import (
 	"strconv"
 )
 
-type PgData struct {
-	Client_id      int
-	Client_name    string
-	Mapping_id     int
-	Mapping_name   string
-	Area_farm_id   int
-	Farm_name      string
-	Area_branch_id int
-	Branch_name    string
-	Areas_id       int
-	Areas_name     string
-}
-
 type BQData struct {
-	ClientBQ_id  int
-	Block_id     int
-	Block_parent int
-	Block_name   string
+	ClientBQ_id int
+	Block_id    int
+	//Block_parent int
+	Block_name string
 }
 
 type Client struct {
 	Client_id   int
 	Client_name string
+}
+
+type Client_2 struct {
+	Client_id    int
+	Block_id     int
+	Block_parent int
+	Client_name  string
 }
 
 type Mapping struct {
@@ -44,8 +38,10 @@ type Areas struct {
 }
 
 type Areas_2 struct {
-	Client_id  int
-	Areas_name string
+	Client_id    int
+	Block_id     int
+	Block_parent int
+	Areas_name   string
 }
 
 type Branch struct {
@@ -55,13 +51,23 @@ type Branch struct {
 }
 
 type Branch_2 struct {
-	Client_id   int
-	Branch_name string
+	Client_id    int
+	Block_id     int
+	Block_parent int
+	Branch_name  string
 }
 
 type Farm struct {
 	Client_id int
+	Farm_id   int
 	Farm_name string
+}
+
+type Farm_2 struct {
+	Client_id    int
+	Block_id     int
+	Block_parent int
+	Farm_name    string
 }
 
 func ReadPg() {
@@ -69,18 +75,13 @@ func ReadPg() {
 	db := db.DbConect()
 	defer db.Close()
 
-	queryClient := fmt.Sprintf(
-		"select cli.client_id, cli.name as client_name " +
-			"from client cli " +
-			"where cli.client_id in (163);")
-
-	rows, err := db.Query(queryClient)
-	if err != nil {
-		log.Println("Error:", err.Error())
-	}
+	block_id := 1
 
 	client := Client{}
 	var clientPg []Client
+
+	client_2 := Client_2{}
+	var clientPg_2 []Client_2
 
 	mapping := Mapping{}
 	var mappingPg []Mapping
@@ -100,7 +101,26 @@ func ReadPg() {
 	farm := Farm{}
 	var farmPg []Farm
 
-	//var blocklist []BQData
+	farm_2 := Farm_2{}
+	var farmPg_2 []Farm_2
+
+	bqData := BQData{}
+	var bqDataArr []BQData
+
+	var block_id_cli int
+	var block_id_farm int
+	var block_id_branch int
+
+	//client
+	queryClient := fmt.Sprintf(
+		"select cli.client_id, cli.name as client_name " +
+			"from client cli " +
+			"where cli.client_id in (163, 545);")
+
+	rows, err := db.Query(queryClient)
+	if err != nil {
+		log.Println("Error:", err.Error())
+	}
 
 	for rows.Next() {
 		err := rows.Scan(&client.Client_id, &client.Client_name)
@@ -110,8 +130,19 @@ func ReadPg() {
 
 		clientPg = append(clientPg, client)
 
+		client_2 = Client_2{client.Client_id, block_id, 0, client.Client_name}
+		clientPg_2 = append(clientPg_2, client_2)
+
+		bqData = BQData{client.Client_id, block_id, client.Client_name}
+		bqDataArr = append(bqDataArr, bqData)
+
+		block_id_cli = block_id
+
+		block_id++
+
 		c := strconv.Itoa(client.Client_id)
 
+		//mapping
 		queryMapping := fmt.Sprintf(
 			"select ma.client_id, ma.id " +
 				"from mapping_areas ma " +
@@ -130,6 +161,7 @@ func ReadPg() {
 
 			mappingPg = append(mappingPg, mapping)
 
+			//areas
 			queryAreas := fmt.Sprintf(
 				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id," + "ar.area_branch_id " +
 					"from areas ar " +
@@ -146,12 +178,18 @@ func ReadPg() {
 					log.Println("Error:", err.Error())
 				}
 
-				areasPg = append(areasPg, areas)
+				// areasPg = append(areasPg, areas)
 
-				areas_2 = Areas_2{areas.Client_id, areas.Areas_name}
+				// areas_2 = Areas_2{areas.Client_id, block_id, areas.Areas_name}
 
-				areas_2_Pg = append(areas_2_Pg, areas_2)
+				// areas_2_Pg = append(areas_2_Pg, areas_2)
 
+				// bqData = BQData{areas.Client_id, block_id, areas.Areas_name}
+				// bqDataArr = append(bqDataArr, bqData)
+
+				// block_id++
+
+				//branch
 				queryBranch := fmt.Sprintf(
 					"select " + strconv.Itoa(mapping.Client_id) + " as Client_id , " + "b.name as branch_name, b.area_farm_id " +
 						"from area_branch b " +
@@ -168,14 +206,20 @@ func ReadPg() {
 						log.Println("Error:", err.Error())
 					}
 
-					branchPg = append(branchPg, branch)
+					// branchPg = append(branchPg, branch)
 
-					branch_2 = Branch_2{branch.Client_id, branch.Branch_name}
+					// branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
 
-					branch_2_Pg = append(branch_2_Pg, branch_2)
+					// branch_2_Pg = append(branch_2_Pg, branch_2)
 
+					// bqData = BQData{branch.Client_id, block_id, branch.Branch_name}
+					// bqDataArr = append(bqDataArr, bqData)
+
+					// block_id++
+
+					//farm
 					queryFarm := fmt.Sprintf(
-						"select " + strconv.Itoa(mapping.Client_id) + " as Client_id , " + "f.name as farm_name " +
+						"select " + strconv.Itoa(mapping.Client_id) + " as Client_id , f.area_farm_id, " + "f.name as farm_name " +
 							"from area_farm f " +
 							"where f.area_farm_id = " + strconv.Itoa(branch.Area_farm_id))
 
@@ -186,22 +230,58 @@ func ReadPg() {
 
 					for rows.Next() {
 
-						err := rows.Scan(&farm.Client_id, &farm.Farm_name)
+						err := rows.Scan(&farm.Client_id, &farm.Farm_id, &farm.Farm_name)
 						if err != nil {
 							log.Println("Error:", err.Error())
 						}
 
+						//if para validar se farm.Farm_id ja existe no array
+
 						farmPg = append(farmPg, farm)
+
+						farm_2 = Farm_2{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
+
+						farmPg_2 = append(farmPg_2, farm_2)
+
+						block_id_farm = block_id
+
+						bqData = BQData{farm.Client_id, block_id, farm.Farm_name}
+						bqDataArr = append(bqDataArr, bqData)
+
+						block_id++
+
 					}
+					branchPg = append(branchPg, branch)
+
+					branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
+
+					branch_2_Pg = append(branch_2_Pg, branch_2)
+
+					bqData = BQData{branch.Client_id, block_id, branch.Branch_name}
+					bqDataArr = append(bqDataArr, bqData)
+
+					block_id_branch = block_id
+
+					block_id++
 
 				}
+				areasPg = append(areasPg, areas)
+
+				areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
+
+				areas_2_Pg = append(areas_2_Pg, areas_2)
+
+				bqData = BQData{areas.Client_id, block_id, areas.Areas_name}
+				bqDataArr = append(bqDataArr, bqData)
+
+				block_id++
 
 			}
 
 		}
 
 	}
-	fmt.Println("cli", clientPg)
+	fmt.Println("cli", clientPg_2)
 	fmt.Println("=========")
 	fmt.Println("map", mappingPg)
 	fmt.Println("=========")
@@ -209,5 +289,8 @@ func ReadPg() {
 	fmt.Println("=========")
 	fmt.Println("branch", branch_2_Pg)
 	fmt.Println("=========")
-	fmt.Println("farm", farmPg)
+	fmt.Println("farm", farmPg_2)
+	fmt.Println("=========")
+	// fmt.Println("bqdata", bqDataArr)
+
 }
