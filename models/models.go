@@ -99,37 +99,37 @@ func VerifyBranchID(branchID int) bool {
 
 func ReadPg() {
 
+	block_id := 1
+
 	db := db.DbConect()
 	defer db.Close()
 
-	block_id := 1
-
 	client := Client{}
-	var clientPg []Client
+	// var clientPg []Client
 
-	client_2 := Client_2{}
-	var clientPg_2 []Client_2
+	// client_2 := Client_2{}
+	// var clientPg_2 []Client_2
 
 	mapping := Mapping{}
-	var mappingPg []Mapping
+	// var mappingPg []Mapping
 
 	areas := Areas{}
-	var areasPg []Areas
+	// var areasPg []Areas
 
-	areas_2 := Areas_2{}
-	var areas_2_Pg []Areas_2
+	// areas_2 := Areas_2{}
+	// var areas_2_Pg []Areas_2
 
 	branch := Branch{}
-	var branchPg []Branch
+	// var branchPg []Branch
 
-	branch_2 := Branch_2{}
-	var branch_2_Pg []Branch_2
+	// branch_2 := Branch_2{}
+	// var branch_2_Pg []Branch_2
 
 	farm := Farm{}
-	var farmPg []Farm
+	// var farmPg []Farm
 
-	farm_2 := Farm_2{}
-	var farmPg_2 []Farm_2
+	// farm_2 := Farm_2{}
+	// var farmPg_2 []Farm_2
 
 	bqData := BQData{}
 	var bqDataArr []BQData
@@ -155,10 +155,10 @@ func ReadPg() {
 			log.Println("Error:", err.Error())
 		}
 
-		clientPg = append(clientPg, client)
+		// clientPg = append(clientPg, client)
 
-		client_2 = Client_2{client.Client_id, block_id, 0, client.Client_name}
-		clientPg_2 = append(clientPg_2, client_2)
+		// client_2 = Client_2{client.Client_id, block_id, 0, client.Client_name}
+		// clientPg_2 = append(clientPg_2, client_2)
 
 		bqData = BQData{client.Client_id, block_id, 0, client.Client_name}
 		bqDataArr = append(bqDataArr, bqData)
@@ -186,7 +186,7 @@ func ReadPg() {
 				log.Println("Error:", err.Error())
 			}
 
-			mappingPg = append(mappingPg, mapping)
+			// mappingPg = append(mappingPg, mapping)
 
 			//areas
 			queryAreas := fmt.Sprintf(
@@ -240,16 +240,16 @@ func ReadPg() {
 							log.Println("Error:", err.Error())
 						}
 
-						farmPg = append(farmPg, farm)
+						// farmPg = append(farmPg, farm)
 
-						farm_2 = Farm_2{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
+						// farm_2 = Farm_2{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
 
 						bqData = BQData{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
 
 						//if para validar se farm.Farm_id ja existe no array
 						if !VerifyFarmID(farm.Farm_id) { //Element is not present in the slice
 							FarmList = append(FarmList, farm.Farm_id)
-							farmPg_2 = append(farmPg_2, farm_2)
+							// farmPg_2 = append(farmPg_2, farm_2)
 							bqDataArr = append(bqDataArr, bqData)
 							block_id_farm = block_id
 
@@ -262,15 +262,15 @@ func ReadPg() {
 						block_id++
 
 					}
-					branchPg = append(branchPg, branch)
+					// branchPg = append(branchPg, branch)
 
-					branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
+					// branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
 
 					bqData = BQData{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
 
 					if !VerifyBranchID(branch.Branch_id) { //Element is not present in the slice
 						BranchList = append(BranchList, branch.Branch_id)
-						branch_2_Pg = append(branch_2_Pg, branch_2)
+						// branch_2_Pg = append(branch_2_Pg, branch_2)
 						bqDataArr = append(bqDataArr, bqData)
 						block_id_branch = block_id
 					}
@@ -281,11 +281,11 @@ func ReadPg() {
 					block_id++
 
 				}
-				areasPg = append(areasPg, areas)
+				// areasPg = append(areasPg, areas)
 
-				areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
+				// areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
 
-				areas_2_Pg = append(areas_2_Pg, areas_2)
+				// areas_2_Pg = append(areas_2_Pg, areas_2)
 
 				bqData = BQData{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
 				bqDataArr = append(bqDataArr, bqData)
@@ -297,15 +297,15 @@ func ReadPg() {
 
 	}
 
-	fmt.Println("cli", clientPg_2)
-	fmt.Println("=========")
-	fmt.Println("map", mappingPg)
-	fmt.Println("=========")
-	fmt.Println("areas", areas_2_Pg)
-	fmt.Println("=========")
-	fmt.Println("branch", branch_2_Pg)
-	fmt.Println("=========")
-	fmt.Println("farm", farmPg_2)
+	// fmt.Println("cli", clientPg_2)
+	// fmt.Println("=========")
+	// fmt.Println("map", mappingPg)
+	// fmt.Println("=========")
+	// fmt.Println("areas", areas_2_Pg)
+	// fmt.Println("=========")
+	// fmt.Println("branch", branch_2_Pg)
+	// fmt.Println("=========")
+	// fmt.Println("farm", farmPg_2)
 	fmt.Println("=========")
 	fmt.Println("bqdata", bqDataArr)
 
