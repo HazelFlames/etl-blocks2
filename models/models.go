@@ -4,7 +4,10 @@ import (
 	"etl-blocks2/db"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
+
+	geojson "github.com/paulmach/go.geojson"
 )
 
 type BQData struct {
@@ -35,6 +38,7 @@ type Areas struct {
 	Client_id       int
 	Areas_name      string
 	Areas_branch_id int
+	Bounds          geojson.Geometry
 }
 
 type Areas_2 struct {
@@ -42,6 +46,7 @@ type Areas_2 struct {
 	Block_id     int
 	Block_parent int
 	Areas_name   string
+	Bounds       geojson.Geometry
 }
 
 type Branch struct {
@@ -105,31 +110,31 @@ func ReadPg() {
 	defer db.Close()
 
 	client := Client{}
-	// var clientPg []Client
+	var clientPg []Client
 
-	// client_2 := Client_2{}
-	// var clientPg_2 []Client_2
+	client_2 := Client_2{}
+	var clientPg_2 []Client_2
 
 	mapping := Mapping{}
-	// var mappingPg []Mapping
+	var mappingPg []Mapping
 
 	areas := Areas{}
-	// var areasPg []Areas
+	var areasPg []Areas
 
-	// areas_2 := Areas_2{}
-	// var areas_2_Pg []Areas_2
+	areas_2 := Areas_2{}
+	var areas_2_Pg []Areas_2
 
 	branch := Branch{}
-	// var branchPg []Branch
+	var branchPg []Branch
 
-	// branch_2 := Branch_2{}
-	// var branch_2_Pg []Branch_2
+	branch_2 := Branch_2{}
+	var branch_2_Pg []Branch_2
 
 	farm := Farm{}
-	// var farmPg []Farm
+	var farmPg []Farm
 
-	// farm_2 := Farm_2{}
-	// var farmPg_2 []Farm_2
+	farm_2 := Farm_2{}
+	var farmPg_2 []Farm_2
 
 	bqData := BQData{}
 	var bqDataArr []BQData
@@ -138,11 +143,13 @@ func ReadPg() {
 	var block_id_farm int
 	var block_id_branch int
 
+	var poli []geojson.Geometry
+
 	//client
 	queryClient := fmt.Sprintf(
 		"select cli.client_id, cli.name as client_name " +
 			"from client cli " +
-			"where cli.client_id in (163, 545);")
+			"where cli.client_id in (163,545);")
 
 	rows, err := db.Query(queryClient)
 	if err != nil {
@@ -155,10 +162,10 @@ func ReadPg() {
 			log.Println("Error:", err.Error())
 		}
 
-		// clientPg = append(clientPg, client)
+		clientPg = append(clientPg, client)
 
-		// client_2 = Client_2{client.Client_id, block_id, 0, client.Client_name}
-		// clientPg_2 = append(clientPg_2, client_2)
+		client_2 = Client_2{client.Client_id, block_id, 0, client.Client_name}
+		clientPg_2 = append(clientPg_2, client_2)
 
 		bqData = BQData{client.Client_id, block_id, 0, client.Client_name}
 		bqDataArr = append(bqDataArr, bqData)
@@ -186,11 +193,11 @@ func ReadPg() {
 				log.Println("Error:", err.Error())
 			}
 
-			// mappingPg = append(mappingPg, mapping)
+			mappingPg = append(mappingPg, mapping)
 
 			//areas
 			queryAreas := fmt.Sprintf(
-				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id," + "ar.area_branch_id " +
+				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id, ar.area_branch_id, ST_AsGeoJSON(ar.bounds) as bounds " +
 					"from areas ar " +
 					"where mapping_area_id = " + strconv.Itoa(mapping.Mapping_id))
 
@@ -200,7 +207,7 @@ func ReadPg() {
 			}
 
 			for rows.Next() {
-				err := rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_branch_id)
+				err := rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_branch_id, &areas.Bounds)
 				if err != nil {
 					log.Println("Error:", err.Error())
 				}
@@ -240,16 +247,16 @@ func ReadPg() {
 							log.Println("Error:", err.Error())
 						}
 
-						// farmPg = append(farmPg, farm)
+						farmPg = append(farmPg, farm)
 
-						// farm_2 = Farm_2{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
+						farm_2 = Farm_2{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
 
 						bqData = BQData{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
 
 						//if para validar se farm.Farm_id ja existe no array
 						if !VerifyFarmID(farm.Farm_id) { //Element is not present in the slice
 							FarmList = append(FarmList, farm.Farm_id)
-							// farmPg_2 = append(farmPg_2, farm_2)
+							farmPg_2 = append(farmPg_2, farm_2)
 							bqDataArr = append(bqDataArr, bqData)
 							block_id_farm = block_id
 
@@ -262,15 +269,15 @@ func ReadPg() {
 						block_id++
 
 					}
-					// branchPg = append(branchPg, branch)
+					branchPg = append(branchPg, branch)
 
-					// branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
+					branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
 
 					bqData = BQData{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
 
 					if !VerifyBranchID(branch.Branch_id) { //Element is not present in the slice
 						BranchList = append(BranchList, branch.Branch_id)
-						// branch_2_Pg = append(branch_2_Pg, branch_2)
+						branch_2_Pg = append(branch_2_Pg, branch_2)
 						bqDataArr = append(bqDataArr, bqData)
 						block_id_branch = block_id
 					}
@@ -281,11 +288,13 @@ func ReadPg() {
 					block_id++
 
 				}
-				// areasPg = append(areasPg, areas)
+				areasPg = append(areasPg, areas)
 
-				// areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
+				areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name, areas.Bounds}
 
-				// areas_2_Pg = append(areas_2_Pg, areas_2)
+				poli = append(poli, areas.Bounds)
+
+				areas_2_Pg = append(areas_2_Pg, areas_2)
 
 				bqData = BQData{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
 				bqDataArr = append(bqDataArr, bqData)
@@ -306,7 +315,78 @@ func ReadPg() {
 	// fmt.Println("branch", branch_2_Pg)
 	// fmt.Println("=========")
 	// fmt.Println("farm", farmPg_2)
-	fmt.Println("=========")
-	fmt.Println("bqdata", bqDataArr)
 
+	// fmt.Println(poli[0].Polygon[0][0][0])
+	// fmt.Println(poli[0].Polygon[0][0][1])
+
+	//fmt.Println(poli)
+
+	var lon []float64
+	var lat []float64
+	for i, v := range poli {
+		gugu := v.Polygon[0]
+		fmt.Printf("\n ======= area %d ==========", i)
+		for i, v := range gugu {
+			fmt.Println(i, v)
+			lon = append(lon, v[0])
+			lat = append(lat, v[1])
+		}
+	}
+	//fmt.Println(lon)
+	fmt.Println(len(lon))
+	fmt.Println(len(lat))
+
+	fmt.Println(MinIntSlice(lat))
+	fmt.Println(MaxIntSlice(lat))
+
+	// g, _ := geojson.UnmarshalGeometry([]byte(poli[0]))
+	// fmt.Println(g)
+
+	// fmt.Println(len(poli)) //32
+
+	// fmt.Println(poli[0])
+	// fmt.Println("=========")
+	// s := strings.Split(poli[0], ",")
+	// fmt.Println(s)
+	// fmt.Println("=========")
+
+	// if strings.Contains(s[0], "POLYGON((") {
+	// 	s[0] = strings.Trim(s[0], "POLYGON((")
+	// }
+
+	// fmt.Println(s[0])
+	// fmt.Println("=========")
+
+	// fmt.Println(s[1])
+	// fmt.Println("=========")
+
+	// fmt.Println(s[2])
+	// fmt.Println("=========")
+
+	// if strings.Contains(s[len(s)-1], "))") {
+	// 	s[len(s)-1] = strings.Trim(s[len(s)-1], "))")
+	// }
+
+	// fmt.Println(s[len(s)-1])
+	// fmt.Println("=========")
+
+	// s1 := strings.Split(s[1], " ")
+	// fmt.Println(s1)
+	// fmt.Println("=========")
+
+	// fmt.Println(s[len(s)-1])
+	// fmt.Println("=========")
+
+	//fmt.Println("bqdata", bqDataArr)
+
+}
+
+func MinIntSlice(v []float64) float64 {
+	sort.Float64s(v)
+	return v[0]
+}
+
+func MaxIntSlice(v []float64) float64 {
+	sort.Float64s(v)
+	return v[len(v)-1]
 }
