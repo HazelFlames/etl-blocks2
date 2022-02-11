@@ -54,6 +54,7 @@ type Branch struct {
 	Branch_id    int
 	Branch_name  string
 	Area_farm_id int
+	Bounds       float64
 }
 
 type Branch_2 struct {
@@ -61,6 +62,7 @@ type Branch_2 struct {
 	Block_id     int
 	Block_parent int
 	Branch_name  string
+	Bounds       float64
 }
 
 type Farm struct {
@@ -101,6 +103,10 @@ func VerifyBranchID(branchID int) bool {
 	}
 	return status
 }
+
+var lat []float64
+
+var minMaxLatLon []float64
 
 func ReadPg() {
 
@@ -144,6 +150,7 @@ func ReadPg() {
 	var block_id_branch int
 
 	var poli []geojson.Geometry
+	long := []float64{}
 
 	//client
 	queryClient := fmt.Sprintf(
@@ -157,6 +164,7 @@ func ReadPg() {
 	}
 
 	for rows.Next() {
+
 		err := rows.Scan(&client.Client_id, &client.Client_name)
 		if err != nil {
 			log.Println("Error:", err.Error())
@@ -188,6 +196,7 @@ func ReadPg() {
 		}
 
 		for rows.Next() {
+
 			err := rows.Scan(&mapping.Client_id, &mapping.Mapping_id)
 			if err != nil {
 				log.Println("Error:", err.Error())
@@ -207,6 +216,7 @@ func ReadPg() {
 			}
 
 			for rows.Next() {
+
 				err := rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_branch_id, &areas.Bounds)
 				if err != nil {
 					log.Println("Error:", err.Error())
@@ -222,6 +232,7 @@ func ReadPg() {
 				if err != nil {
 					log.Println("Error:", err.Error())
 				}
+
 				for rows.Next() {
 
 					err := rows.Scan(&branch.Client_id, &branch.Branch_id, &branch.Branch_name, &branch.Area_farm_id)
@@ -271,7 +282,7 @@ func ReadPg() {
 					}
 					branchPg = append(branchPg, branch)
 
-					branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
+					branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name, 0}
 
 					bqData = BQData{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
 
@@ -288,11 +299,15 @@ func ReadPg() {
 					block_id++
 
 				}
+
 				areasPg = append(areasPg, areas)
 
 				areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name, areas.Bounds}
 
+				//iterar o area.Bounds direto = cannot range over areas.Bounds (variable of type geojson.Geometry)
 				poli = append(poli, areas.Bounds)
+
+				minMaxLatLon = append(minMaxLatLon, 0)
 
 				areas_2_Pg = append(areas_2_Pg, areas_2)
 
@@ -300,9 +315,25 @@ func ReadPg() {
 				bqDataArr = append(bqDataArr, bqData)
 
 			}
+
 			block_id++
+			fmt.Println(len(poli))
+
+			for _, v := range poli {
+				gugu := v.Polygon
+
+				for _, lala := range gugu {
+					for _, v := range lala {
+
+						long = append(long, v[0])
+
+					}
+				}
+			}
 
 		}
+		sort.Float64s(long)
+		fmt.Println(long[0])
 
 	}
 
@@ -312,70 +343,9 @@ func ReadPg() {
 	// fmt.Println("=========")
 	// fmt.Println("areas", areas_2_Pg)
 	// fmt.Println("=========")
-	// fmt.Println("branch", branch_2_Pg)
+	fmt.Println("branch", branch_2_Pg)
 	// fmt.Println("=========")
 	// fmt.Println("farm", farmPg_2)
-
-	// fmt.Println(poli[0].Polygon[0][0][0])
-	// fmt.Println(poli[0].Polygon[0][0][1])
-
-	//fmt.Println(poli)
-
-	var lon []float64
-	var lat []float64
-	for i, v := range poli {
-		gugu := v.Polygon[0]
-		fmt.Printf("\n ======= area %d ==========", i)
-		for i, v := range gugu {
-			fmt.Println(i, v)
-			lon = append(lon, v[0])
-			lat = append(lat, v[1])
-		}
-	}
-	//fmt.Println(lon)
-	fmt.Println(len(lon))
-	fmt.Println(len(lat))
-
-	fmt.Println(MinIntSlice(lat))
-	fmt.Println(MaxIntSlice(lat))
-
-	// g, _ := geojson.UnmarshalGeometry([]byte(poli[0]))
-	// fmt.Println(g)
-
-	// fmt.Println(len(poli)) //32
-
-	// fmt.Println(poli[0])
-	// fmt.Println("=========")
-	// s := strings.Split(poli[0], ",")
-	// fmt.Println(s)
-	// fmt.Println("=========")
-
-	// if strings.Contains(s[0], "POLYGON((") {
-	// 	s[0] = strings.Trim(s[0], "POLYGON((")
-	// }
-
-	// fmt.Println(s[0])
-	// fmt.Println("=========")
-
-	// fmt.Println(s[1])
-	// fmt.Println("=========")
-
-	// fmt.Println(s[2])
-	// fmt.Println("=========")
-
-	// if strings.Contains(s[len(s)-1], "))") {
-	// 	s[len(s)-1] = strings.Trim(s[len(s)-1], "))")
-	// }
-
-	// fmt.Println(s[len(s)-1])
-	// fmt.Println("=========")
-
-	// s1 := strings.Split(s[1], " ")
-	// fmt.Println(s1)
-	// fmt.Println("=========")
-
-	// fmt.Println(s[len(s)-1])
-	// fmt.Println("=========")
 
 	//fmt.Println("bqdata", bqDataArr)
 
