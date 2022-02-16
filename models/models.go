@@ -4,29 +4,24 @@ import (
 	"etl-blocks2/db"
 	"fmt"
 	"log"
-	"sort"
+	"math"
 	"strconv"
 
 	geojson "github.com/paulmach/go.geojson"
 )
 
 type BQData struct {
-	ClientBQ_id  int
 	Block_id     int
+	ClientBQ_id  int
 	Block_parent int
 	Block_name   string
+	Block_bounds geojson.Geometry
+	Block_abrv   string
 }
 
 type Client struct {
 	Client_id   int
 	Client_name string
-}
-
-type Client_2 struct {
-	Client_id    int
-	Block_id     int
-	Block_parent int
-	Client_name  string
 }
 
 type Mapping struct {
@@ -36,17 +31,11 @@ type Mapping struct {
 
 type Areas struct {
 	Client_id       int
+	Areas_id        int
 	Areas_name      string
 	Areas_branch_id int
 	Bounds          geojson.Geometry
-}
-
-type Areas_2 struct {
-	Client_id    int
-	Block_id     int
-	Block_parent int
-	Areas_name   string
-	Bounds       geojson.Geometry
+	Block_abrv      string
 }
 
 type Branch struct {
@@ -55,60 +44,74 @@ type Branch struct {
 	Branch_name  string
 	Area_farm_id int
 	Bounds       float64
-}
-
-type Branch_2 struct {
-	Client_id    int
-	Block_id     int
-	Block_parent int
-	Branch_name  string
-	Bounds       float64
+	Block_abrv   string
 }
 
 type Farm struct {
-	Client_id int
-	Farm_id   int
-	Farm_name string
+	Client_id  int
+	Farm_id    int
+	Farm_name  string
+	Block_abrv string
 }
 
-type Farm_2 struct {
-	Client_id    int
-	Block_id     int
-	Block_parent int
-	Farm_name    string
+type TableId struct {
+	Block_id int
+	Type_id  int
+	Type     string
 }
 
-var FarmList []int
+func Polygon_GetArea(geoareas []geojson.Geometry) *geojson.Geometry {
 
-func VerifyFarmID(farmID int) bool {
-	var status bool = false
-	for _, x := range FarmList {
-		if x == farmID {
-			status = true
-			break
+	min_lat := 0.0
+	max_lat := 0.0
+	min_long := 0.0
+	max_long := 0.0
+
+	n := 0
+	for _, geo := range geoareas {
+		polygon := geo.Polygon
+		for _, elements := range polygon {
+			for _, coord := range elements {
+				if n == 0 {
+					min_lat = coord[0]
+					max_lat = coord[0]
+					min_long = coord[1]
+					max_long = coord[1]
+				} else {
+					min_lat = math.Min(min_lat, coord[0])
+					max_lat = math.Max(max_lat, coord[0])
+					min_long = math.Min(min_long, coord[1])
+					max_long = math.Max(max_long, coord[1])
+				}
+				n++
+			}
 		}
 	}
-	return status
-}
+	a_point := fmt.Sprintf("[%f,%f]", min_lat, min_long)
+	b_point := fmt.Sprintf("[%f,%f]", min_lat, max_long)
+	c_point := fmt.Sprintf("[%f,%f]", max_lat, min_long)
+	d_point := fmt.Sprintf("[%f,%f]", max_lat, max_long)
+	pol := fmt.Sprintf("[[ %s, %s, %s, %s ]]", a_point, b_point, c_point, d_point)
 
-var BranchList []int
+	rawAreaJSON := []byte(fmt.Sprintf(`{ "type": "Polygon", "coordinates": %s}`, pol))
 
-func VerifyBranchID(branchID int) bool {
-	var status bool = false
-	for _, x := range BranchList {
-		if x == branchID {
-			status = true
-			break
-		}
+	polygon_area, err := geojson.UnmarshalGeometry(rawAreaJSON)
+	if err != nil {
+		fmt.Println("Geo error: ", err)
+		return nil
 	}
-	return status
+	return polygon_area
 }
-
-var lat []float64
-
-var minMaxLatLon []float64
 
 func ReadPg() {
+
+	// Criando hashtables para armazenar os blocos
+	client_blks := make(map[int]int)
+	client_bqs := make(map[int]int)
+	branch_blks := make(map[int]int)
+	branch_bqs := make(map[int]int)
+	farm_blks := make(map[int]int)
+	farm_bqs := make(map[int]int)
 
 	block_id := 1
 
@@ -116,31 +119,10 @@ func ReadPg() {
 	defer db.Close()
 
 	client := Client{}
-	var clientPg []Client
-
-	client_2 := Client_2{}
-	var clientPg_2 []Client_2
-
 	mapping := Mapping{}
-	var mappingPg []Mapping
-
 	areas := Areas{}
-	var areasPg []Areas
-
-	areas_2 := Areas_2{}
-	var areas_2_Pg []Areas_2
-
 	branch := Branch{}
-	var branchPg []Branch
-
-	branch_2 := Branch_2{}
-	var branch_2_Pg []Branch_2
-
 	farm := Farm{}
-	var farmPg []Farm
-
-	farm_2 := Farm_2{}
-	var farmPg_2 []Farm_2
 
 	bqData := BQData{}
 	var bqDataArr []BQData
@@ -149,8 +131,12 @@ func ReadPg() {
 	var block_id_farm int
 	var block_id_branch int
 
-	var poli []geojson.Geometry
-	long := []float64{}
+	var poli_areas []geojson.Geometry
+	var poli_branches []geojson.Geometry
+	var poli_farms []geojson.Geometry
+
+	table_id := TableId{}
+	var table_id_arr []TableId
 
 	//client
 	queryClient := fmt.Sprintf(
@@ -158,66 +144,55 @@ func ReadPg() {
 			"from client cli " +
 			"where cli.client_id in (163,545);")
 
-	rows, err := db.Query(queryClient)
+	client_rows, err := db.Query(queryClient)
 	if err != nil {
 		log.Println("Error:", err.Error())
 	}
 
-	for rows.Next() {
+	for client_rows.Next() {
 
-		err := rows.Scan(&client.Client_id, &client.Client_name)
+		err := client_rows.Scan(&client.Client_id, &client.Client_name)
 		if err != nil {
 			log.Println("Error:", err.Error())
 		}
 
-		clientPg = append(clientPg, client)
-
-		client_2 = Client_2{client.Client_id, block_id, 0, client.Client_name}
-		clientPg_2 = append(clientPg_2, client_2)
-
-		bqData = BQData{client.Client_id, block_id, 0, client.Client_name}
-		bqDataArr = append(bqDataArr, bqData)
-
+		client_blks[client.Client_id] = block_id
 		block_id_cli = block_id
-
 		block_id++
-
-		c := strconv.Itoa(client.Client_id)
 
 		//mapping
 		queryMapping := fmt.Sprintf(
 			"select ma.client_id, ma.id " +
 				"from mapping_areas ma " +
-				"where ma.client_id = " + c)
+				"where ma.client_id = " + strconv.Itoa(client.Client_id))
 
-		rows, err := db.Query(queryMapping)
+		mapping_rows, err := db.Query(queryMapping)
 		if err != nil {
 			log.Println("Error:", err.Error())
 		}
 
-		for rows.Next() {
+		poli_areas = nil
+		for mapping_rows.Next() {
 
-			err := rows.Scan(&mapping.Client_id, &mapping.Mapping_id)
+			err := mapping_rows.Scan(&mapping.Client_id, &mapping.Mapping_id)
 			if err != nil {
 				log.Println("Error:", err.Error())
 			}
-
-			mappingPg = append(mappingPg, mapping)
 
 			//areas
 			queryAreas := fmt.Sprintf(
-				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id, ar.area_branch_id, ST_AsGeoJSON(ar.bounds) as bounds " +
+				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id, ar.id, ar.area_branch_id, ST_AsGeoJSON(ar.bounds) as bounds " +
 					"from areas ar " +
 					"where mapping_area_id = " + strconv.Itoa(mapping.Mapping_id))
 
-			rows, err := db.Query(queryAreas)
+			areas_rows, err := db.Query(queryAreas)
 			if err != nil {
 				log.Println("Error:", err.Error())
 			}
 
-			for rows.Next() {
+			for areas_rows.Next() {
 
-				err := rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_branch_id, &areas.Bounds)
+				err := areas_rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_id, &areas.Areas_branch_id, &areas.Bounds)
 				if err != nil {
 					log.Println("Error:", err.Error())
 				}
@@ -228,14 +203,14 @@ func ReadPg() {
 						"from area_branch b " +
 						"where b.area_branch_id = " + strconv.Itoa(areas.Areas_branch_id))
 
-				rows, err := db.Query(queryBranch)
+				branch_rows, err := db.Query(queryBranch)
 				if err != nil {
 					log.Println("Error:", err.Error())
 				}
 
-				for rows.Next() {
+				for branch_rows.Next() {
 
-					err := rows.Scan(&branch.Client_id, &branch.Branch_id, &branch.Branch_name, &branch.Area_farm_id)
+					err := branch_rows.Scan(&branch.Client_id, &branch.Branch_id, &branch.Branch_name, &branch.Area_farm_id)
 					if err != nil {
 						log.Println("Error:", err.Error())
 					}
@@ -246,117 +221,123 @@ func ReadPg() {
 							"from area_farm f " +
 							"where f.area_farm_id = " + strconv.Itoa(branch.Area_farm_id))
 
-					rows, err := db.Query(queryFarm)
+					farm_rows, err := db.Query(queryFarm)
 					if err != nil {
 						log.Println("Error:", err.Error())
 					}
 
-					for rows.Next() {
+					for farm_rows.Next() {
 
-						err := rows.Scan(&farm.Client_id, &farm.Farm_id, &farm.Farm_name)
+						err := farm_rows.Scan(&farm.Client_id, &farm.Farm_id, &farm.Farm_name)
 						if err != nil {
 							log.Println("Error:", err.Error())
 						}
 
-						farmPg = append(farmPg, farm)
+						abrv_farm := farm.Farm_name[0:3]
 
-						farm_2 = Farm_2{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
-
-						bqData = BQData{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
-
-						//if para validar se farm.Farm_id ja existe no array
-						if !VerifyFarmID(farm.Farm_id) { //Element is not present in the slice
-							FarmList = append(FarmList, farm.Farm_id)
-							farmPg_2 = append(farmPg_2, farm_2)
+						if farm_blks[farm.Farm_id] == 0 {
+							poli_farms = nil
+							poli_farms = append(poli_farms, areas.Bounds)
+							bqData = BQData{block_id, farm.Client_id, block_id_cli, farm.Farm_name,
+								*Polygon_GetArea(poli_farms), abrv_farm}
 							bqDataArr = append(bqDataArr, bqData)
-							block_id_farm = block_id
 
+							//tabela separada
+							table_id = TableId{block_id, farm.Farm_id, "Farm"}
+							table_id_arr = append(table_id_arr, table_id)
+							//
+							farm_blks[farm.Farm_id] = block_id
+							farm_bqs[farm.Farm_id] = len(bqDataArr) - 1
+							block_id_farm = block_id
+							block_id++
+						} else {
+							block_id_farm = farm_blks[farm.Farm_id]
+							poli_farms = nil
+							poli_farms = append(poli_farms, bqDataArr[farm_bqs[farm.Farm_id]].Block_bounds)
+							poli_farms = append(poli_farms, areas.Bounds)
+							bqDataArr[farm_bqs[farm.Farm_id]].Block_bounds = *Polygon_GetArea(poli_farms)
 						}
 
-						// bqData = BQData{farm.Client_id, block_id, block_id_cli, farm.Farm_name}
-
-						// bqDataArr = append(bqDataArr, bqData)
-
-						block_id++
-
 					}
-					branchPg = append(branchPg, branch)
 
-					branch_2 = Branch_2{branch.Client_id, block_id, block_id_farm, branch.Branch_name, 0}
+					abrv_branch := branch.Branch_name[0:3]
 
-					bqData = BQData{branch.Client_id, block_id, block_id_farm, branch.Branch_name}
-
-					if !VerifyBranchID(branch.Branch_id) { //Element is not present in the slice
-						BranchList = append(BranchList, branch.Branch_id)
-						branch_2_Pg = append(branch_2_Pg, branch_2)
+					if branch_blks[branch.Branch_id] == 0 {
+						poli_branches = nil
+						poli_branches = append(poli_branches, areas.Bounds)
+						bqData = BQData{block_id, branch.Client_id, block_id_farm, branch.Branch_name,
+							*Polygon_GetArea(poli_branches), abrv_branch}
 						bqDataArr = append(bqDataArr, bqData)
+
+						//tabela separada
+						table_id = TableId{block_id, branch.Branch_id, "Branch"}
+						table_id_arr = append(table_id_arr, table_id)
+						//
+						branch_blks[branch.Branch_id] = block_id
+						branch_bqs[branch.Branch_id] = len(bqDataArr) - 1
 						block_id_branch = block_id
+						block_id++
+					} else {
+						block_id_branch = branch_blks[branch.Branch_id]
+						poli_branches = nil
+						poli_branches = append(poli_branches, bqDataArr[branch_bqs[branch.Branch_id]].Block_bounds)
+						poli_branches = append(poli_branches, areas.Bounds)
+						bqDataArr[branch_bqs[branch.Branch_id]].Block_bounds = *Polygon_GetArea(poli_branches)
 					}
-
-					// bqData = BQData{branch.Client_id, block_id, branch.Branch_name}
-					// bqDataArr = append(bqDataArr, bqData)
-
-					block_id++
 
 				}
 
-				areasPg = append(areasPg, areas)
+				poli_areas = append(poli_areas, areas.Bounds)
 
-				areas_2 = Areas_2{areas.Client_id, block_id, block_id_branch, areas.Areas_name, areas.Bounds}
+				abrv_areas := areas.Areas_name[0:3]
 
-				//iterar o area.Bounds direto = cannot range over areas.Bounds (variable of type geojson.Geometry)
-				poli = append(poli, areas.Bounds)
-
-				minMaxLatLon = append(minMaxLatLon, 0)
-
-				areas_2_Pg = append(areas_2_Pg, areas_2)
-
-				bqData = BQData{areas.Client_id, block_id, block_id_branch, areas.Areas_name}
+				bqData = BQData{block_id, areas.Client_id, block_id_branch, areas.Areas_name, areas.Bounds, abrv_areas}
 				bqDataArr = append(bqDataArr, bqData)
 
-			}
+				//tabela separada
+				table_id = TableId{block_id, areas.Areas_id, "Areas"}
+				table_id_arr = append(table_id_arr, table_id)
+				//
 
-			block_id++
-			fmt.Println(len(poli))
+				block_id++
 
-			for _, v := range poli {
-				gugu := v.Polygon
-
-				for _, lala := range gugu {
-					for _, v := range lala {
-
-						long = append(long, v[0])
-
-					}
-				}
 			}
 
 		}
-		sort.Float64s(long)
-		fmt.Println(long[0])
+
+		abrv_client := client.Client_name[0:3]
+		bqData = BQData{block_id_cli, client.Client_id, 0, client.Client_name, *Polygon_GetArea(poli_areas), abrv_client}
+		bqDataArr = append(bqDataArr, bqData)
+		client_bqs[client.Client_id] = len(bqDataArr) - 1
+
+		//tabela separada
+		table_id = TableId{block_id_cli, client.Client_id, "Client"}
+		table_id_arr = append(table_id_arr, table_id)
+		//
 
 	}
 
-	// fmt.Println("cli", clientPg_2)
-	// fmt.Println("=========")
-	// fmt.Println("map", mappingPg)
-	// fmt.Println("=========")
-	// fmt.Println("areas", areas_2_Pg)
-	// fmt.Println("=========")
-	fmt.Println("branch", branch_2_Pg)
-	// fmt.Println("=========")
-	// fmt.Println("farm", farmPg_2)
+	fmt.Println("bqdata", bqDataArr)
 
-	//fmt.Println("bqdata", bqDataArr)
+	// Printing Clients
+	fmt.Println("\nClients:")
+	for _, i := range client_bqs {
+		fmt.Println(bqDataArr[i])
+	}
 
-}
+	// Printing Farms
+	fmt.Println("\nFarms:")
+	for _, i := range farm_bqs {
+		fmt.Println(bqDataArr[i])
+	}
 
-func MinIntSlice(v []float64) float64 {
-	sort.Float64s(v)
-	return v[0]
-}
+	// Printing Branches
+	fmt.Println("\nBranches:")
+	for _, i := range branch_bqs {
+		fmt.Println(bqDataArr[i])
+	}
 
-func MaxIntSlice(v []float64) float64 {
-	sort.Float64s(v)
-	return v[len(v)-1]
+	//Tabela separada com o id de cada coisa, o block_id de cada coisa e a identificação
+	//fmt.Println("\nTableId: ", table_id_arr)
+
 }
