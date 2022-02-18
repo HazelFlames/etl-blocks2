@@ -1,7 +1,9 @@
 package models
 
 import (
+	"encoding/json"
 	"etl-blocks2/db"
+	"etl-blocks2/dbRedis"
 	"fmt"
 	"log"
 	"math"
@@ -11,12 +13,12 @@ import (
 )
 
 type BQData struct {
-	Block_id     int
-	ClientBQ_id  int
-	Block_parent int
-	Block_name   string
-	Block_bounds geojson.Geometry
-	Block_abrv   string
+	Block_id     int              `json:"block_id"`
+	ClientBQ_id  int              `json:"client_id"`
+	Block_parent int              `json:"block_parent"`
+	Block_name   string           `json:"block_name"`
+	Block_bounds geojson.Geometry `json:"bounds"`
+	Block_abrv   string           `json:"abvr"`
 }
 
 type Client struct {
@@ -117,6 +119,9 @@ func ReadPg() {
 
 	db := db.DbConect()
 	defer db.Close()
+
+	redis := dbRedis.ConnectRedis()
+	defer redis.Close()
 
 	client := Client{}
 	mapping := Mapping{}
@@ -339,5 +344,25 @@ func ReadPg() {
 
 	//Tabela separada com o id de cada coisa, o block_id de cada coisa e a identificação
 	//fmt.Println("\nTableId: ", table_id_arr)
+
+	for _, v := range bqDataArr {
+		json, err := json.Marshal(v)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		err = redis.Set("zeus", json, 0).Err()
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		val, err := redis.Get("zeus").Result()
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println(val)
+
+	}
 
 }
