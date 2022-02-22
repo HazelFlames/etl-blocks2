@@ -2,8 +2,6 @@ package dbRedis
 
 import (
 	"github.com/go-redis/redis"
-	// "context"
-	// redis "cloud.google.com/go/redis/apiv1"
 )
 
 func ConnectRedis() *redis.Client {
@@ -17,13 +15,3 @@ func ConnectRedis() *redis.Client {
 	return client
 
 }
-
-// func ConnectRedis() *redis.CloudRedisClient {
-
-// 	ctx := context.Background()
-
-// 	c, _ := redis.NewCloudRedisClient(ctx)
-
-// 	return c
-
-// }

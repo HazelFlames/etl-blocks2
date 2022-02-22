@@ -351,12 +351,12 @@ func ReadPg() {
 			fmt.Println(err)
 		}
 
-		err = redis.Set("zeus", json, 0).Err()
+		err = redis.Set(strconv.Itoa(v.Block_id), json, 0).Err()
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		val, err := redis.Get("zeus").Result()
+		val, err := redis.Get(strconv.Itoa(v.Block_id)).Result()
 		if err != nil {
 			fmt.Println(err)
 		}
