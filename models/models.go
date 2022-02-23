@@ -105,7 +105,7 @@ func Polygon_GetArea(geoareas []geojson.Geometry) *geojson.Geometry {
 	return polygon_area
 }
 
-func ReadPg() {
+func ReadPg() []BQData {
 
 	// Criando hashtables para armazenar os blocos
 	client_blks := make(map[int]int)
@@ -364,5 +364,10 @@ func ReadPg() {
 		fmt.Println(val)
 
 	}
+
+	// oi, _ := redis.Get("5").Result()
+	// fmt.Println(oi)
+
+	return bqDataArr
 
 }
