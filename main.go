@@ -1,12 +1,13 @@
 package main
 
 import (
-	"etl-blocks2/db"
-	"etl-blocks2/models"
+	"etl-blocks2/routes"
 )
 
 func main() {
-	db.DbConect()
-	models.ReadPg()
+
+	r := routes.LoadRoutes()
+
+	r.Run("localhost:8080")
 
 }
