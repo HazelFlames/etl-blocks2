@@ -12,5 +12,7 @@ func LoadRoutes() *gin.Engine {
 
 	router.GET("/data", controllers.GetData)
 
+	router.GET("", controllers.GetTest)
+
 	return router
 }
