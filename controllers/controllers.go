@@ -14,5 +14,7 @@ func GetData(c *gin.Context) {
 
 func GetTest(c *gin.Context) {
 
-	c.IndentedJSON(http.StatusOK, "")
+	c.JSON(200, gin.H{
+		"status": "up",
+	})
 }

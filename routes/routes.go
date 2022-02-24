@@ -6,13 +6,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func LoadRoutes() *gin.Engine {
+func LoadRoutes() {
 
 	router := gin.Default()
 
+	router.GET("/", controllers.GetTest)
+
 	router.GET("/data", controllers.GetData)
 
-	router.GET("", controllers.GetTest)
+	router.Run()
 
-	return router
 }
