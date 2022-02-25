@@ -22,6 +22,6 @@ func LoadRoutes() {
 
 func noRoute (c *gin.Context) {
 	c.JSON(404, gin.H{
-		"message": "Page not found."
+		"message": "Page not found.",
 	})
 }
