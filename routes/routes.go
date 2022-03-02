@@ -6,11 +6,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func LoadRoutes() *gin.Engine {
+func LoadRoutes() {
 
 	router := gin.Default()
 
-	router.GET("/data", controllers.GetData)
+	router.GET("/", controllers.GetTest)
 
-	return router
+	router.GET("/data", controllers.GetData)
+	
+	router.NoRoute(noRoute)
+
+	router.Run()
+
+}
+
+func noRoute (c *gin.Context) {
+	c.JSON(404, gin.H{
+		"message": "Page not found.",
+	})
 }

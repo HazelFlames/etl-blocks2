@@ -145,9 +145,10 @@ func ReadPg() []BQData {
 
 	//client
 	queryClient := fmt.Sprintf(
-		"select cli.client_id, cli.name as client_name " +
+		"select distinct cli.client_id, cli.name as client_name " +
 			"from client cli " +
-			"where cli.client_id in (163,545);")
+			"left join mapping_areas ma on ma.client_id = cli.client_id " +
+			"where cli.situation_id in (1, 2, 7) and ma.id is not null and cli.client_id in (163);")
 
 	client_rows, err := db.Query(queryClient)
 	if err != nil {
