@@ -16,6 +16,7 @@ steps:
       '--platform', 'managed',
       '--port', '8080',
       '--allow-unauthenticated',
+      '--vpc-connector', 'default-connector',
       '--set-env-vars', 'PG_ETL_PASS=${_PG_ETL_PASS},PG_ETL_USER=${_PG_ETL_USER},PG_ETL_DB=${_PG_ETL_DB},PG_ETL_HOST=${_PG_ETL_HOST},REDIS_IP_PORT=${_REDIS_IP_PORT}'
     ]
 images:
