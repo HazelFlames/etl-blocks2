@@ -1,0 +1,23 @@
+# macOS-only files
+.DS_Store
+*/.DS_Store
+*/*/.DS_Store
+
+# Temp files
+*/temp*
+*/*/temp*
+temp?
+
+# IDEs and editors
+.idea
+.idea/*
+.nova
+.nova/*
+
+# git
+.git
+.gitignore
+
+# Google Cloud Platform
+cloudbuild.yml
+cloudbuild.yaml

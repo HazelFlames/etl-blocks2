@@ -1,0 +1,23 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    docker build -t us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:${SHORT_SHA} -t us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:latest .
+    docker push us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:${SHORT_SHA}
+    docker push us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:latest
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: 
+    [
+      'run', 'deploy','redis-cache-service',
+      '--image', 'us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:${SHORT_SHA}',
+      '--region', 'us-central1',
+      '--platform', 'managed',
+      '--port', '8080',
+      '--allow-unauthenticated',
+      '--set-env-vars', 'PG_ETL_PASS=${_PG_ETL_PASS},PG_ETL_USER=${_PG_ETL_USER},PG_ETL_DB=${_PG_ETL_DB},PG_ETL_HOST=${_PG_ETL_HOST},REDIS_IP_PORT=${_REDIS_IP_PORT}'
+    ]
+images:
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:${SHORT_SHA}'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/eb/etl-blocks2:latest'

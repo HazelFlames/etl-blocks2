@@ -1,0 +1,13 @@
+# macOS-only files
+.DS_Store
+*/.DS_Store
+*/*/.DS_Store
+
+# IDEs
+.idea
+.idea/*
+.nova
+.nova/*
+
+# Environment
+*.env
