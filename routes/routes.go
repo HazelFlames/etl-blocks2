@@ -12,15 +12,19 @@ func LoadRoutes() {
 
 	router.GET("/", controllers.GetTest)
 
-	router.GET("/data", controllers.GetData)
-	
+	router.POST("/data", controllers.PostData)
+
+	router.GET("/size", controllers.GetSize)
+
+	router.GET("/values", controllers.GetValues)
+
 	router.NoRoute(noRoute)
 
 	router.Run()
 
 }
 
-func noRoute (c *gin.Context) {
+func noRoute(c *gin.Context) {
 	c.JSON(404, gin.H{
 		"message": "Page not found.",
 	})
