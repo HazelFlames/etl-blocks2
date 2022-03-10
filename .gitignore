@@ -1,7 +1,6 @@
 # macOS-only files
 .DS_Store
-*/.DS_Store
-*/*/.DS_Store
+**/.DS_Store
 
 # IDEs
 .idea
@@ -11,3 +10,4 @@
 
 # Environment
 *.env
+**/.env
