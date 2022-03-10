@@ -8,17 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	geojson "github.com/paulmach/go.geojson"
 )
-
-type Blocks struct {
-	Block_id     int              `json:"block_id"`
-	ClientBQ_id  int              `json:"client_id"`
-	Block_parent int              `json:"block_parent"`
-	Block_name   string           `json:"block_name"`
-	Block_bounds geojson.Geometry `json:"bounds"`
-	Block_abrv   string           `json:"abvr"`
-}
 
 func PostData(c *gin.Context) {
 	areas := models.ReadPg()
@@ -51,8 +41,8 @@ func GetValues(c *gin.Context) {
 
 	keys, _ := redis.Keys("*").Result()
 
-	var values []Blocks
-	var blocks Blocks
+	var values []models.BQData
+	var blocks models.BQData
 	for _, v := range keys {
 		value, err := redis.Get(v).Result()
 		if err != nil {

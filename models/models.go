@@ -13,12 +13,14 @@ import (
 )
 
 type BQData struct {
-	Block_id     int              `json:"block_id"`
-	ClientBQ_id  int              `json:"client_id"`
-	Block_parent int              `json:"block_parent"`
-	Block_name   string           `json:"block_name"`
-	Block_bounds geojson.Geometry `json:"bounds"`
-	Block_abrv   string           `json:"abvr"`
+	Block_id      int              `json:"block_id"`
+	ClientBQ_id   int              `json:"client_id"`
+	Block_parent  int              `json:"block_parent"`
+	Block_name    string           `json:"block_name"`
+	Block_bounds  geojson.Geometry `json:"bounds"`
+	Block_abrv    string           `json:"abvr"`
+	Centroid      geojson.Geometry `json:"centroid"`
+	Centroid_text string           `json:"centroid_text"`
 }
 
 type Client struct {
@@ -37,6 +39,8 @@ type Areas struct {
 	Areas_name      string
 	Areas_branch_id int
 	Bounds          geojson.Geometry
+	Centroid        geojson.Geometry
+	Centroid_text   string
 	Block_abrv      string
 }
 
@@ -75,24 +79,24 @@ func Polygon_GetArea(geoareas []geojson.Geometry) *geojson.Geometry {
 		for _, elements := range polygon {
 			for _, coord := range elements {
 				if n == 0 {
-					min_lat = coord[0]
-					max_lat = coord[0]
-					min_long = coord[1]
-					max_long = coord[1]
+					min_long = coord[0]
+					max_long = coord[0]
+					min_lat = coord[1]
+					max_lat = coord[1]
 				} else {
-					min_lat = math.Min(min_lat, coord[0])
-					max_lat = math.Max(max_lat, coord[0])
-					min_long = math.Min(min_long, coord[1])
-					max_long = math.Max(max_long, coord[1])
+					min_long = math.Min(min_long, coord[0])
+					max_long = math.Max(max_long, coord[0])
+					min_lat = math.Min(min_lat, coord[1])
+					max_lat = math.Max(max_lat, coord[1])
 				}
 				n++
 			}
 		}
 	}
-	a_point := fmt.Sprintf("[%f,%f]", min_lat, min_long)
-	b_point := fmt.Sprintf("[%f,%f]", min_lat, max_long)
-	c_point := fmt.Sprintf("[%f,%f]", max_lat, min_long)
-	d_point := fmt.Sprintf("[%f,%f]", max_lat, max_long)
+	a_point := fmt.Sprintf("[%f,%f]", min_long, min_lat)
+	b_point := fmt.Sprintf("[%f,%f]", max_long, min_lat)
+	c_point := fmt.Sprintf("[%f,%f]", min_long, max_lat)
+	d_point := fmt.Sprintf("[%f,%f]", max_long, max_lat)
 	pol := fmt.Sprintf("[[ %s, %s, %s, %s ]]", a_point, b_point, c_point, d_point)
 
 	rawAreaJSON := []byte(fmt.Sprintf(`{ "type": "Polygon", "coordinates": %s}`, pol))
@@ -187,7 +191,8 @@ func ReadPg() []BQData {
 
 			//areas
 			queryAreas := fmt.Sprintf(
-				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id, ar.id, ar.area_branch_id, ST_AsGeoJSON(ar.bounds) as bounds " +
+				"select ar.name as areas_name,  " + strconv.Itoa(mapping.Client_id) + "as Client_id, ar.id, ar.area_branch_id, ST_AsGeoJSON(ar.bounds) as bounds, " +
+					"ST_AsGeoJSON(ST_Centroid(ar.bounds)) as centroid, st_astext(ST_Centroid(bounds)) as centroid_text " +
 					"from areas ar " +
 					"where mapping_area_id = " + strconv.Itoa(mapping.Mapping_id))
 
@@ -198,7 +203,7 @@ func ReadPg() []BQData {
 
 			for areas_rows.Next() {
 
-				err := areas_rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_id, &areas.Areas_branch_id, &areas.Bounds)
+				err := areas_rows.Scan(&areas.Areas_name, &areas.Client_id, &areas.Areas_id, &areas.Areas_branch_id, &areas.Bounds, &areas.Centroid, &areas.Centroid_text)
 				if err != nil {
 					log.Println("Error:", err.Error())
 				}
@@ -244,8 +249,19 @@ func ReadPg() []BQData {
 						if farm_blks[farm.Farm_id] == 0 {
 							poli_farms = nil
 							poli_farms = append(poli_farms, areas.Bounds)
-							bqData = BQData{block_id, farm.Client_id, block_id_cli, farm.Farm_name,
-								*Polygon_GetArea(poli_farms), abrv_farm}
+							bounds_farms := *Polygon_GetArea(poli_farms)
+							centroid := Centroid(bounds_farms.Polygon)
+							centroidText := CentroidText(centroid)
+							bqData = BQData{
+								Block_id:      block_id,
+								ClientBQ_id:   farm.Client_id,
+								Block_parent:  block_id_cli,
+								Block_name:    farm.Farm_name,
+								Block_bounds:  *Polygon_GetArea(poli_farms),
+								Block_abrv:    abrv_farm,
+								Centroid:      *centroid,
+								Centroid_text: centroidText,
+							}
 							bqDataArr = append(bqDataArr, bqData)
 
 							//tabela separada
@@ -261,7 +277,12 @@ func ReadPg() []BQData {
 							poli_farms = nil
 							poli_farms = append(poli_farms, bqDataArr[farm_bqs[farm.Farm_id]].Block_bounds)
 							poli_farms = append(poli_farms, areas.Bounds)
-							bqDataArr[farm_bqs[farm.Farm_id]].Block_bounds = *Polygon_GetArea(poli_farms)
+							bounds_farms := *Polygon_GetArea(poli_farms)
+							centroid := Centroid(bounds_farms.Polygon)
+							centroidText := CentroidText(centroid)
+							bqDataArr[farm_bqs[farm.Farm_id]].Block_bounds = bounds_farms
+							bqDataArr[farm_bqs[farm.Farm_id]].Centroid = *centroid
+							bqDataArr[farm_bqs[farm.Farm_id]].Centroid_text = centroidText
 						}
 
 					}
@@ -271,8 +292,18 @@ func ReadPg() []BQData {
 					if branch_blks[branch.Branch_id] == 0 {
 						poli_branches = nil
 						poli_branches = append(poli_branches, areas.Bounds)
-						bqData = BQData{block_id, branch.Client_id, block_id_farm, branch.Branch_name,
-							*Polygon_GetArea(poli_branches), abrv_branch}
+						bounds_branches := *Polygon_GetArea(poli_branches)
+						centroid := Centroid(bounds_branches.Polygon)
+						centroidText := CentroidText(centroid)
+						bqData = BQData{
+							Block_id:      block_id,
+							ClientBQ_id:   branch.Client_id,
+							Block_parent:  block_id_farm,
+							Block_name:    branch.Branch_name,
+							Block_bounds:  *Polygon_GetArea(poli_branches),
+							Block_abrv:    abrv_branch,
+							Centroid:      *centroid,
+							Centroid_text: centroidText}
 						bqDataArr = append(bqDataArr, bqData)
 
 						//tabela separada
@@ -288,7 +319,12 @@ func ReadPg() []BQData {
 						poli_branches = nil
 						poli_branches = append(poli_branches, bqDataArr[branch_bqs[branch.Branch_id]].Block_bounds)
 						poli_branches = append(poli_branches, areas.Bounds)
-						bqDataArr[branch_bqs[branch.Branch_id]].Block_bounds = *Polygon_GetArea(poli_branches)
+						bounds_branches := *Polygon_GetArea(poli_branches)
+						centroid := Centroid(bounds_branches.Polygon)
+						centroidText := CentroidText(centroid)
+						bqDataArr[branch_bqs[branch.Branch_id]].Block_bounds = bounds_branches
+						bqDataArr[branch_bqs[branch.Branch_id]].Centroid = *centroid
+						bqDataArr[branch_bqs[branch.Branch_id]].Centroid_text = centroidText
 					}
 
 				}
@@ -297,7 +333,7 @@ func ReadPg() []BQData {
 
 				abrv_areas := areas.Areas_name[0:3]
 
-				bqData = BQData{block_id, areas.Client_id, block_id_branch, areas.Areas_name, areas.Bounds, abrv_areas}
+				bqData = BQData{block_id, areas.Client_id, block_id_branch, areas.Areas_name, areas.Bounds, abrv_areas, areas.Centroid, areas.Centroid_text}
 				bqDataArr = append(bqDataArr, bqData)
 
 				//tabela separada
@@ -311,8 +347,20 @@ func ReadPg() []BQData {
 
 		}
 
+		bounds_client := *Polygon_GetArea(poli_areas)
+		centroid := Centroid(bounds_client.Polygon)
+		centroidText := CentroidText(centroid)
+
 		abrv_client := client.Client_name[0:3]
-		bqData = BQData{block_id_cli, client.Client_id, 0, client.Client_name, *Polygon_GetArea(poli_areas), abrv_client}
+		bqData = BQData{
+			Block_id:      block_id_cli,
+			ClientBQ_id:   client.Client_id,
+			Block_parent:  0,
+			Block_name:    client.Client_name,
+			Block_bounds:  bounds_client,
+			Block_abrv:    abrv_client,
+			Centroid:      *centroid,
+			Centroid_text: centroidText}
 		bqDataArr = append(bqDataArr, bqData)
 		client_bqs[client.Client_id] = len(bqDataArr) - 1
 
@@ -352,22 +400,12 @@ func ReadPg() []BQData {
 			fmt.Println(err)
 		}
 
-		err = redis.Set(strconv.Itoa(v.Block_id), json, 0).Err()
+		err = redis.Set(strconv.Itoa(v.Block_id)+":"+strconv.Itoa(v.Block_parent), json, 0).Err()
 		if err != nil {
 			fmt.Println(err)
 		}
-
-		val, err := redis.Get(strconv.Itoa(v.Block_id)).Result()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		fmt.Println(val)
 
 	}
-
-	// oi, _ := redis.Get("5").Result()
-	// fmt.Println(oi)
 
 	return bqDataArr
 
