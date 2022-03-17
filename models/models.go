@@ -287,7 +287,14 @@ func ReadPg() []BQData {
 
 					}
 
-					abrv_branch := branch.Branch_name[0:3]
+					var abrv_branch string
+					if len(branch.Branch_name) > 1 && len(branch.Branch_name) < 3 {
+						abrv_branch = branch.Branch_name[0:2]
+					} else if len(branch.Branch_name) < 2 {
+						abrv_branch = branch.Branch_name[0:1]
+					} else {
+						abrv_branch = branch.Branch_name[0:3]
+					}
 
 					if branch_blks[branch.Branch_id] == 0 {
 						poli_branches = nil
@@ -331,7 +338,14 @@ func ReadPg() []BQData {
 
 				poli_areas = append(poli_areas, areas.Bounds)
 
-				abrv_areas := areas.Areas_name[0:3]
+				var abrv_areas string
+				if len(areas.Areas_name) > 1 && len(areas.Areas_name) < 3 {
+					abrv_areas = areas.Areas_name[0:2]
+				} else if len(areas.Areas_name) < 2 {
+					abrv_areas = areas.Areas_name[0:1]
+				} else {
+					abrv_areas = areas.Areas_name[0:3]
+				}
 
 				bqData = BQData{block_id, areas.Client_id, block_id_branch, areas.Areas_name, areas.Bounds, abrv_areas, areas.Centroid, areas.Centroid_text}
 				bqDataArr = append(bqDataArr, bqData)
