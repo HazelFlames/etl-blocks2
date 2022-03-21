@@ -12,7 +12,7 @@ steps:
     args:
       - '-c'
       - |
-        REDIS_IP_PORT=$$(gcloud redis instances list --region=us-central1 --filter=name="${_REDIS_NAME_BASE}/redis-cache" --format="value(host)")
+        REDIS_IP_PORT="$$(gcloud redis instances list --region=us-central1 --filter=name="${_REDIS_NAME_BASE}/redis-cache" --format="value(host)")"
         gcloud run deploy service-etl-blocks \
         --platform=managed \
         --port=8080 \
