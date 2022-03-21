@@ -16,7 +16,7 @@ steps:
         gcloud run deploy service-etl-blocks \
         --platform=managed \
         --port=8080 \
-        --set-env-vars=PG_ETL_DB=$${PG_ETL_DB},PG_ETL_HOST=$${PG_ETL_HOST},PG_ETL_USER=$${PG_ETL_USER},PG_ETL_PASS=$${PG_ETL_PASS} \
+        --set-env-vars=PG_ETL_DB=$${PG_ETL_DB},PG_ETL_HOST=$${PG_ETL_HOST},PG_ETL_USER=$${PG_ETL_USER},PG_ETL_PASS=$${PG_ETL_PASS},REDIS_IP_PORT=$${REDIS_IP_PORT} \
         --image=us-central1-docker.pkg.dev/${PROJECT_ID}/etl-blocks/service:${SHORT_SHA} \
         --allow-unauthenticated \
         --vpc-connector=redis-connector \
