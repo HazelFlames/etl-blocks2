@@ -29,7 +29,7 @@ steps:
 substitutions:
   _REDIS_NAME_BASE: projects/${PROJECT_ID}/locations/us-central1/instances
 availableSecrets:
-  secreteManager:
+  secretManager:
     - versionName: projects/${PROJECT_ID}/secrets/ETL_PostgreSQL_database/versions/1
       env: 'PG_ETL_DB'
     - versionName: projects/${PROJECT_ID}/secrets/ETL_PostgreSQL_URL/versions/1
