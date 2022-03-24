@@ -14,6 +14,7 @@ steps:
       - |
         REDIS_IP_PORT="$$(gcloud redis instances list --region=us-central1 --filter=name="${_REDIS_NAME_BASE}/redis-cache" --format="value(host)"):6379"
         gcloud run deploy service-etl-blocks \
+        --concurrency=2 \
         --memory=1024Mi \
         --platform=managed \
         --port=8080 \
