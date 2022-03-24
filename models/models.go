@@ -124,9 +124,6 @@ func ReadPg() []BQData {
 	db := db.DbConect()
 	defer db.Close()
 
-	redis := dbRedis.ConnectRedis()
-	defer redis.Close()
-
 	client := Client{}
 	mapping := Mapping{}
 	areas := Areas{}
@@ -384,6 +381,9 @@ func ReadPg() []BQData {
 		//
 
 	}
+
+	redis := dbRedis.ConnectRedis()
+	defer redis.Close()
 
 	fmt.Println("bqdata", bqDataArr)
 
